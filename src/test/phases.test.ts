@@ -41,7 +41,7 @@ describe('课程数据', () => {
   it('getLesson 应该返回正确的课程', () => {
     const result = getLesson('phase-3', '03-04');
     expect(result).toBeDefined();
-    expect(result!.lesson.title).toContain('Activation Functions');
+    expect(result!.lesson.title).toContain('激活函数');
   });
 
   it('getTotalLessons 应该返回正确的总数', () => {
