@@ -13,7 +13,7 @@ import { phases } from '../data/phases';
       <!-- 标题区 -->
       <div class="mb-8">
         <h1 class="text-2xl font-semibold text-ink tracking-tight">翻译进度监控</h1>
-        <p class="text-sm text-ink-2 mt-1">实时查看 Markdown 课程内容翻译状态</p>
+        <p class="text-sm text-ink-2 mt-1">实时查看 Markdown 课程内容翻译状态 · 多进程并行</p>
       </div>
 
       <!-- 统计卡片 -->
@@ -55,6 +55,14 @@ import { phases } from '../data/phases';
         </div>
       </div>
 
+      <!-- 并行工作进程 -->
+      <div class="bg-white rounded-[12px] p-6 shadow-sm border border-black/[0.04] mb-8">
+        <h2 class="text-sm font-semibold text-ink mb-4">并行工作进程</h2>
+        <div class="space-y-3" id="worker-cards">
+          <div class="text-xs text-ink-2">等待工作进程启动...</div>
+        </div>
+      </div>
+
       <!-- 阶段进度 -->
       <div class="bg-white rounded-[12px] p-6 shadow-sm border border-black/[0.04] mb-8">
         <h2 class="text-sm font-semibold text-ink mb-4">各阶段进度</h2>
@@ -92,15 +100,36 @@ import { phases } from '../data/phases';
     window.__PHASE_DATA__ = phaseData;
   </script>
 
+  <style>
+    /* 新增日志条目高亮动画 */
+    @keyframes logFlash {
+      0% { background-color: rgba(0, 113, 227, 0.12); }
+      100% { background-color: transparent; }
+    }
+    .log-new {
+      animation: logFlash 2s ease-out forwards;
+    }
+    /* Worker 脉冲指示灯 */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .worker-pulse {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+  </style>
+
   <script>
     const TOTAL = 435;
-    // 从服务端注入的真实阶段数据
     const PHASES = (window as any).__PHASE_DATA__ || [];
+    const WORKER_IDS = ['worker-A', 'worker-B', 'worker-C'];
+    const WORKER_COLORS = ['#0071e3', '#af52de', '#34c759'];
+    const WORKER_LABELS = ['Worker A (Phase 5-9)', 'Worker B (Phase 10-14)', 'Worker C (Phase 15-19)'];
 
     let autoScroll = true;
     let lastLogCount = 0;
+    let workerDataMap: Record<string, any> = {};
 
-    // 格式化时间
     function formatDuration(seconds: number): string {
       if (seconds < 60) return `${Math.round(seconds)}s`;
       if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
@@ -132,7 +161,6 @@ import { phases } from '../data/phases';
       document.getElementById('stat-elapsed')!.textContent = formatDuration(elapsed);
       document.getElementById('stat-speed')!.textContent = speed > 0 ? `${speed.toFixed(1)} 文件/分钟` : '--';
 
-      // 进度条
       document.getElementById('progress-bar')!.setAttribute('style', `width: ${pct}%`);
       document.getElementById('progress-percent')!.textContent = `${pct}%`;
       document.getElementById('progress-detail')!.textContent = `${translated} / ${TOTAL}`;
@@ -141,9 +169,7 @@ import { phases } from '../data/phases';
           ? `预计剩余: ${formatDuration(remaining)}`
           : translated >= TOTAL ? '✅ 已完成' : '计算中...';
 
-      // 阶段进度
       updatePhaseBars(data.translated || []);
-
       return { translated, failed, pct };
     }
 
@@ -174,7 +200,61 @@ import { phases } from '../data/phases';
       container.innerHTML = barsHtml;
     }
 
-    // 更新日志
+    // 更新 Worker 进程卡片
+    function updateWorkers() {
+      const container = document.getElementById('worker-cards')!;
+      let html = '';
+      let anyActive = false;
+
+      WORKER_IDS.forEach((wid, i) => {
+        const data = workerDataMap[wid];
+        const color = WORKER_COLORS[i];
+        const label = WORKER_LABELS[i];
+
+        if (!data) return;
+
+        const pct = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+        const isRunning = data.status === 'running';
+        const isDone = data.status === 'done';
+        const elapsed = data.start_time ? (Date.now() / 1000 - data.start_time) : 0;
+        const speed = elapsed > 0 && data.completed > 0 ? (data.completed / elapsed) : 0;
+        const eta = speed > 0 && !isDone ? ((data.total - data.completed) / speed) : 0;
+
+        if (isRunning) anyActive = true;
+
+        const statusIcon = isDone ? '✅' : isRunning ? '<span class="worker-pulse">🟢</span>' : '⏸️';
+        const statusText = isDone ? '已完成' : isRunning ? '运行中' : '等待中';
+
+        html += `
+          <div class="flex items-center gap-4 p-4 rounded-xl border border-black/[0.04] ${isRunning ? 'bg-gray-50/50' : ''}">
+            <div class="flex-shrink-0 text-lg">${statusIcon}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-sm font-medium text-ink">${label}</span>
+                <span class="text-xs text-ink-2">${statusText} · ${pct}%</span>
+              </div>
+              <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                <div class="h-full rounded-full transition-all duration-700 ease-out"
+                     style="width: ${pct}%; background-color: ${color}"></div>
+              </div>
+              <div class="flex items-center justify-between text-xs text-ink-2">
+                <span>${data.completed} / ${data.total} 文件</span>
+                <span>${speed > 0 ? `${speed.toFixed(2)} 文件/s` : ''}${eta > 0 ? ` · ETA ${formatDuration(eta)}` : ''}</span>
+              </div>
+              ${data.current_file ? `<div class="text-xs text-ink-2 mt-1 truncate">📄 ${data.current_file}</div>` : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      if (!html) {
+        html = '<div class="text-xs text-ink-2">等待工作进程启动...</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    // 更新日志（增量追加，不刷新整个列表）
     function updateLog(logs: any[]) {
       const container = document.getElementById('log-list')!;
       const summary = document.getElementById('log-summary')!;
@@ -182,7 +262,6 @@ import { phases } from '../data/phases';
       const errCount = logs.filter(l => l.status === 'error').length;
       summary.textContent = `共 ${logs.length} 条记录，成功 ${okCount}，失败 ${errCount}`;
 
-      // 只渲染新增的日志（倒序，最新在前）
       const newLogs = logs.slice(lastLogCount);
       if (newLogs.length === 0) return;
 
@@ -193,7 +272,7 @@ import { phases } from '../data/phases';
         const msg = isError && log.msg ? ` — ${log.msg.slice(0, 80)}` : '';
 
         return `
-          <div class="flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-gray-50/50 transition-colors ${isError ? 'bg-red-50/30' : ''}">
+          <div class="log-new flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-gray-50/50 transition-colors ${isError ? 'bg-red-50/30' : ''}">
             <span class="flex-shrink-0">${icon}</span>
             <span class="font-mono text-ink-2 w-[70px] flex-shrink-0">${time}</span>
             <span class="font-mono ${isError ? 'text-red-600' : 'text-ink'}">${log.file}</span>
@@ -210,10 +289,10 @@ import { phases } from '../data/phases';
       }
     }
 
-    // 获取数据
+    // 获取总进度
     async function fetchProgress() {
       try {
-        const res = await fetch('/translate-progress.json?t=' + Date.now());
+        const res = await fetch('/api/translate-progress.json?t=' + Date.now());
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         updateStats(data);
@@ -224,14 +303,35 @@ import { phases } from '../data/phases';
       }
     }
 
+    // 获取日志
     async function fetchLog() {
       try {
-        const res = await fetch('/translate-log.json?t=' + Date.now());
+        const res = await fetch('/api/translate-log.json?t=' + Date.now());
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         updateLog(data.log || []);
       } catch (e) {
         console.warn('获取日志失败:', e);
+      }
+    }
+
+    // 获取各 Worker 状态
+    async function fetchWorkers() {
+      try {
+        const res = await fetch(`/api/workers.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const workers: any[] = await res.json();
+        let changed = false;
+        workers.forEach(w => {
+          if (!w || !w.id) return;
+          if (JSON.stringify(workerDataMap[w.id]) !== JSON.stringify(w)) {
+            workerDataMap[w.id] = w;
+            changed = true;
+          }
+        });
+        if (changed) updateWorkers();
+      } catch (e) {
+        console.warn('获取 worker 状态失败:', e);
       }
     }
 
@@ -249,17 +349,18 @@ import { phases } from '../data/phases';
     document.getElementById('btn-refresh')!.addEventListener('click', () => {
       fetchProgress();
       fetchLog();
+      fetchWorkers();
     });
 
     // 初始化 + 定时轮询
     async function init() {
       await fetchProgress();
       await fetchLog();
-      // 每 5 秒刷新一次
+      await fetchWorkers();
+      // 每 3 秒刷新一次（更快响应）
       setInterval(async () => {
-        await fetchProgress();
-        await fetchLog();
-      }, 5000);
+        await Promise.all([fetchProgress(), fetchLog(), fetchWorkers()]);
+      }, 3000);
     }
 
     init();
