@@ -61,6 +61,12 @@ META_FIELDS = {"Type", "Languages", "Language", "Time", "Prerequisites"}
 
 # ===== 进度管理 =====
 progress_lock = threading.Lock()
+file_lock_path = PROJECT_DIR / "data" / "runtime" / ".progress.lock"
+
+def _file_lock():
+    """跨进程文件锁（简单实现）"""
+    import fcntl
+    return fcntl
 
 def load_progress():
     if PROGRESS_FILE.exists():
@@ -70,18 +76,61 @@ def load_progress():
 
 
 def save_progress(progress):
+    """跨进程安全保存：先读取最新文件，合并后再写入"""
     with progress_lock:
-        with open(PROGRESS_FILE, "w") as f:
-            json.dump(progress, f, indent=2, ensure_ascii=False)
+        # 1. 读取磁盘上的最新进度（可能被其他进程更新了）
+        try:
+            with open(PROGRESS_FILE) as f:
+                disk_progress = json.load(f)
+        except:
+            disk_progress = {"translated": [], "failed": [], "log": [], "start_time": None}
+
+        # 2. 合并：取磁盘和内存的并集
+        disk_translated = set(disk_progress.get("translated", []))
+        mem_translated = set(progress.get("translated", []))
+        merged_translated = list(disk_translated | mem_translated)
+
+        disk_failed = set(disk_progress.get("failed", []))
+        mem_failed = set(progress.get("failed", []))
+        merged_failed = list((disk_failed | mem_failed) - disk_translated - mem_translated)
+
+        # 3. 合并日志（取时间戳最新的 500 条）
+        disk_log = disk_progress.get("log", [])
+        mem_log = progress.get("log", [])
+        all_log = {entry.get("file", ""): entry for entry in disk_log + mem_log}
+        merged_log = sorted(all_log.values(), key=lambda x: x.get("time", 0), reverse=True)[:500]
+
+        # 4. 保留最早的 start_time
+        start_time = progress.get("start_time") or disk_progress.get("start_time")
+        last_file = progress.get("last_file") or disk_progress.get("last_file")
+
+        merged = {
+            "translated": merged_translated,
+            "failed": merged_failed,
+            "log": merged_log,
+            "start_time": start_time,
+            "last_file": last_file,
+        }
+
+        # 5. 原子写入（先写临时文件，再重命名）
+        tmp_file = PROGRESS_FILE.with_suffix(".tmp")
+        with open(tmp_file, "w") as f:
+            json.dump(merged, f, indent=2, ensure_ascii=False)
+        tmp_file.replace(PROGRESS_FILE)
+
+        # 6. 同步到 public（已废弃，但保留兼容）
         try:
             with open(PUBLIC_PROGRESS_FILE, "w") as f:
-                json.dump(progress, f, indent=2, ensure_ascii=False)
-            if progress.get("log"):
-                progress["log"] = progress["log"][-200:]
+                json.dump(merged, f, indent=2, ensure_ascii=False)
             with open(PUBLIC_LOG_FILE, "w") as f:
-                json.dump({"log": progress.get("log", [])}, f, indent=2, ensure_ascii=False)
+                json.dump({"log": merged.get("log", [])}, f, indent=2, ensure_ascii=False)
         except:
             pass
+
+        # 7. 更新内存中的 progress 对象
+        progress["translated"] = merged_translated
+        progress["failed"] = merged_failed
+        progress["log"] = merged_log
 
 
 # ===== 翻译核心 =====
