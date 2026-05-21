@@ -2,17 +2,27 @@ import { useState, useEffect } from 'react';
 import CodeSandbox from './CodeSandbox';
 import ActivationViz from './ActivationViz';
 import GradientDescentViz from './GradientDescentViz';
+import QuizBlock from './QuizBlock';
 
 interface Props {
   phaseId: string;
   lessonId: string;
 }
 
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
 interface ContentBlock {
-  type: 'html' | 'code' | 'viz';
+  type: 'html' | 'code' | 'viz' | 'quiz';
   content: string;
   language?: string;
   vizType?: string;
+  quizQuestions?: QuizQuestion[];
 }
 
 export default function LessonContent({ phaseId, lessonId }: Props) {
@@ -73,6 +83,13 @@ export default function LessonContent({ phaseId, lessonId }: Props) {
             </div>
           );
         }
+        if (block.type === 'quiz' && block.quizQuestions) {
+          return (
+            <div key={i} className="my-4">
+              <QuizBlock questions={block.quizQuestions} lessonId={lessonId} />
+            </div>
+          );
+        }
         return <div key={i} dangerouslySetInnerHTML={{ __html: block.content }} />;
       })}
     </div>
@@ -88,11 +105,13 @@ function parseMarkdown(md: string): ContentBlock[] {
 
   // 匹配 :::viz type="xxx" ... ::: 块
   const vizBlockRegex = /:::viz\s+type="([^"]+)"\s*\n([\s\S]*?):::/g;
+  // 匹配 :::quiz ... ::: 块
+  const quizBlockRegex = /:::quiz\n([\s\S]*?):::/g;
   // 匹配代码块 ```lang\ncode```
   const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
 
   // 合并所有块的起始位置
-  type BlockMatch = { index: number; length: number; type: 'viz' | 'code'; block: ContentBlock };
+  type BlockMatch = { index: number; length: number; block: ContentBlock };
   const allMatches: BlockMatch[] = [];
 
   let m: RegExpExecArray | null;
@@ -100,15 +119,21 @@ function parseMarkdown(md: string): ContentBlock[] {
     allMatches.push({
       index: m.index,
       length: m[0].length,
-      type: 'viz',
       block: { type: 'viz', content: m[2].trim(), vizType: m[1] },
+    });
+  }
+  while ((m = quizBlockRegex.exec(md)) !== null) {
+    const questions = parseQuizContent(m[1].trim());
+    allMatches.push({
+      index: m.index,
+      length: m[0].length,
+      block: { type: 'quiz', content: m[1].trim(), quizQuestions: questions },
     });
   }
   while ((m = codeBlockRegex.exec(md)) !== null) {
     allMatches.push({
       index: m.index,
       length: m[0].length,
-      type: 'code',
       block: { type: 'code', content: m[2].trimEnd(), language: m[1] || 'code' },
     });
   }
@@ -197,4 +222,71 @@ function getFallbackHtml(phaseId: string, lessonId: string): string {
       </p>
     </div>
   `;
+}
+
+/** 解析 :::quiz 块中的问答内容 */
+function parseQuizContent(text: string): QuizQuestion[] {
+  const questions: QuizQuestion[] = [];
+  // 匹配每个问题：**Q1.** 问题文本
+  const questionRegex = /\*\*Q\d+\.\*\*\s*(.+?)(?=\n-)/gs;
+  // 匹配选项：- A) 选项文本
+  const optionRegex = /^- ([A-Z])\)\s*(.+?)(?:\s*✅)?$/gm;
+  // 匹配解析：> 解析文本
+  const explanationRegex = /^>\s*(.+)$/gm;
+
+  // 按问题分割
+  const parts = text.split(/(?=\*\*Q\d+\.\*\*)/);
+
+  for (const part of parts) {
+    if (!part.trim()) continue;
+
+    // 提取问题文本
+    const qMatch = part.match(/\*\*Q\d+\.\*\*\s*(.+)/);
+    if (!qMatch) continue;
+    const question = qMatch[1].trim();
+
+    // 提取选项
+    const options: string[] = [];
+    let correctIndex = 0;
+    let optMatch: RegExpExecArray | null;
+    const optRegex = /^- ([A-Z])\)\s*(.+?)(?:\s*✅)?$/gm;
+    while ((optMatch = optRegex.exec(part)) !== null) {
+      options.push(optMatch[2].trim());
+      if (optMatch[2].includes('✅')) {
+        correctIndex = options.length - 1;
+      }
+    }
+
+    // 提取解析
+    let explanation = '';
+    const expMatch = part.match(/^>\s*(.+)$/m);
+    if (expMatch) {
+      explanation = expMatch[1].trim();
+    }
+
+    // 如果没有通过 ✅ 标记找到正确答案，检查选项文本中的 ✅
+    if (!part.match(/✅/)) {
+      // 尝试从选项中找正确标记
+      const lines = part.split('\n');
+      for (const line of lines) {
+        if (line.match(/^- [A-Z]\).*✅/)) {
+          const idx = line.match(/^[A-Z]/);
+          if (idx) correctIndex = idx[0].charCodeAt(0) - 65;
+          break;
+        }
+      }
+    }
+
+    if (options.length > 0) {
+      questions.push({
+        id: `q-${questions.length + 1}`,
+        question,
+        options,
+        correctIndex,
+        explanation: explanation || '参考课程内容理解正确答案。',
+      });
+    }
+  }
+
+  return questions;
 }
