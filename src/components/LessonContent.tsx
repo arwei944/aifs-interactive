@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import CodeSandbox from './CodeSandbox';
 import ActivationViz from './ActivationViz';
 import GradientDescentViz from './GradientDescentViz';
+import AttentionViz from './AttentionViz';
+import ConvolutionViz from './ConvolutionViz';
+import DiffusionViz from './DiffusionViz';
+import ClusteringViz from './ClusteringViz';
 import QuizBlock from './QuizBlock';
 
 interface Props {
@@ -79,7 +83,12 @@ export default function LessonContent({ phaseId, lessonId }: Props) {
         if (block.type === 'viz') {
           return (
             <div key={i} className="my-4">
-              {block.vizType === 'gradient-descent' ? <GradientDescentViz /> : <ActivationViz />}
+              {block.vizType === 'gradient-descent' ? <GradientDescentViz /> :
+               block.vizType === 'attention' ? <AttentionViz /> :
+               block.vizType === 'convolution' ? <ConvolutionViz /> :
+               block.vizType === 'diffusion' ? <DiffusionViz /> :
+               block.vizType === 'clustering' ? <ClusteringViz /> :
+               <ActivationViz />}
             </div>
           );
         }
