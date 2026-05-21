@@ -1,0 +1,43 @@
+---
+interface Props {
+  title?: string;
+  activeNav?: string;
+}
+
+const { title = 'AI 工程从零学起', activeNav = 'learn' } = Astro.props;
+
+const navItems = [
+  { id: 'learn', label: '学习' },
+  { id: 'path', label: '路径' },
+  { id: 'glossary', label: '术语表' },
+  { id: 'dashboard', label: '仪表盘' },
+];
+---
+
+<header class="fixed top-0 left-0 right-0 z-50 glass-panel h-[52px] flex items-center px-5">
+  <div class="flex items-center gap-2 pr-4">
+    <div class="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+    <div class="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+    <div class="w-3 h-3 rounded-full bg-[#28c840]"></div>
+  </div>
+
+  <div class="absolute left-1/2 -translate-x-1/2 text-[13px] font-medium text-ink">
+    {title}
+  </div>
+
+  <nav class="ml-auto flex gap-1">
+    {navItems.map(item => (
+      <a
+        href={`/${item.id}`}
+        class:list={[
+          'text-[13px] font-normal px-3 py-1.5 rounded-md transition-all duration-200',
+          item.id === activeNav
+            ? 'text-blue bg-blue/[0.08]'
+            : 'text-ink-2 hover:bg-black/[0.04] hover:text-ink',
+        ]}
+      >
+        {item.label}
+      </a>
+    ))}
+  </nav>
+</header>

@@ -1,0 +1,73 @@
+---
+interface Props {
+  phaseProgress?: { done: number; total: number };
+  overallProgress?: { done: number; total: number };
+  streak?: number;
+}
+
+const { phaseProgress = { done: 3, total: 8 }, overallProgress = { done: 42, total: 300 }, streak = 7 } = Astro.props;
+
+const phasePercent = Math.round((phaseProgress.done / phaseProgress.total) * 100);
+const overallPercent = Math.round((overallProgress.done / overallProgress.total) * 100);
+
+const heatmapData = [0,0,1,2,3,4,2,1,0,3,4,2,1,0,0,1,3,4,4,2,1,0,0,0,1,2,3,4,3,2,0,1,0,2,3];
+---
+
+<aside class="bg-white/60 backdrop-blur-xl border-l border-border w-[280px] p-5 overflow-y-auto max-h-[calc(100vh-52px)] sticky top-[52px] hidden xl:block">
+  <!-- Phase Progress -->
+  <div class="card p-5 mb-4">
+    <div class="text-micro font-semibold text-ink-3 uppercase tracking-wider mb-3.5">阶段 3 进度</div>
+    <div class="h-1 bg-bg rounded-full overflow-hidden mb-2.5">
+      <div class="h-full bg-blue rounded-full transition-all duration-600" style={`width: ${phasePercent}%`}></div>
+    </div>
+    <div class="flex justify-between text-caption text-ink-2">
+      <span><span class="text-ink font-semibold">{phaseProgress.done}</span> / {phaseProgress.total} 课时</span>
+      <span>{phasePercent}%</span>
+    </div>
+  </div>
+
+  <!-- Overall Progress -->
+  <div class="card p-5 mb-4">
+    <div class="text-micro font-semibold text-ink-3 uppercase tracking-wider mb-3.5">总体进度</div>
+    <div class="h-1 bg-bg rounded-full overflow-hidden mb-2.5">
+      <div class="h-full bg-blue rounded-full transition-all duration-600" style={`width: ${overallPercent}%`}></div>
+    </div>
+    <div class="flex justify-between text-caption text-ink-2">
+      <span><span class="text-ink font-semibold">{overallProgress.done}</span> / {overallProgress.total} 课时</span>
+      <span>{overallPercent}%</span>
+    </div>
+  </div>
+
+  <!-- Streak -->
+  <div class="card p-5 mb-4 text-center">
+    <div class="text-[42px] font-bold text-amber leading-none tracking-tight">🔥 {streak}</div>
+    <div class="text-caption font-medium text-ink-2 mt-1">天连续学习</div>
+    <div class="grid grid-cols-7 gap-[3px] mt-3.5">
+      {heatmapData.map(level => (
+        <div class:list={[
+          'aspect-square rounded-[3px]',
+          level === 0 ? 'bg-bg' : level === 1 ? 'bg-blue/15' : level === 2 ? 'bg-blue/30' : level === 3 ? 'bg-blue/50' : 'bg-blue',
+        ]}></div>
+      ))}
+    </div>
+  </div>
+
+  <!-- Key Terms -->
+  <div class="card p-5">
+    <div class="text-micro font-semibold text-ink-3 uppercase tracking-wider mb-3.5">关键术语</div>
+    <div class="space-y-2">
+      <div class="bg-surface border border-border rounded-lg p-3.5 shadow-sm">
+        <div class="text-[13px] font-semibold text-ink mb-1">神经元死亡</div>
+        <div class="text-caption text-ink-2 leading-relaxed">当神经元输出恒为 0，梯度永远为 0，该神经元不再学习</div>
+      </div>
+      <div class="bg-surface border border-border rounded-lg p-3.5 shadow-sm">
+        <div class="text-[13px] font-semibold text-ink mb-1">梯度消失</div>
+        <div class="text-caption text-ink-2 leading-relaxed">梯度在反向传播中逐层衰减至接近 0，底层网络几乎不更新</div>
+      </div>
+      <div class="bg-surface border border-border rounded-lg p-3.5 shadow-sm">
+        <div class="text-[13px] font-semibold text-ink mb-1">饱和</div>
+        <div class="text-caption text-ink-2 leading-relaxed">激活函数在输入极端值时输出趋于常数，梯度接近 0</div>
+      </div>
+    </div>
+  </div>
+</aside>

@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import RightPanel from '../components/RightPanel.astro';
+
+const lessons = [
+  { num: '1', title: '感知机', status: 'done' as const },
+  { num: '2', title: '多层网络', status: 'done' as const },
+  { num: '3', title: '反向传播', status: 'done' as const },
+  { num: '4', title: '激活函数', status: 'active' as const },
+  { num: '5', title: '损失函数', status: 'pending' as const },
+  { num: '6', title: '优化器', status: 'pending' as const },
+  { num: '7', title: '正则化', status: 'pending' as const },
+  { num: '8', title: '批量归一化', status: 'pending' as const },
+];
+
+const phases = [
+  { id: '0', label: '阶段 0 · 环境搭建', status: 'done' as const },
+  { id: '1', label: '阶段 1 · 数学基础', status: 'done' as const },
+  { id: '2', label: '阶段 2 · 机器学习', status: 'done' as const },
+  { id: '3', label: '阶段 3 · 深度学习', status: 'current' as const },
+  { id: '4', label: '阶段 4 · 计算机视觉', status: 'pending' as const },
+  { id: '5', label: '阶段 5 · 自然语言处理', status: 'pending' as const },
+  { id: '7', label: '阶段 7 · Transformer', status: 'pending' as const },
+  { id: '10', label: '阶段 10 · 大语言模型', status: 'pending' as const },
+  { id: '14', label: '阶段 14 · 智能体工程', status: 'pending' as const },
+];
+
+const stats = [
+  { label: '课时', value: '428', icon: '📚' },
+  { label: '阶段', value: '20', icon: '🎯' },
+  { label: '语言', value: '4', icon: '🌐' },
+  { label: '时长', value: '~320h', icon: '⏱' },
+];
+
+const featuredPhases = [
+  { num: '0', name: '环境搭建', lessons: 12, hours: '~14h', status: '已完成', color: 'green' },
+  { num: '1', name: '数学基础', lessons: 22, hours: '~23h', status: '已完成', color: 'green' },
+  { num: '2', name: '机器学习', lessons: 18, hours: '~21h', status: '已完成', color: 'green' },
+  { num: '3', name: '深度学习核心', lessons: 13, hours: '~15h', status: '进行中', color: 'blue' },
+  { num: '4', name: '计算机视觉', lessons: 28, hours: '~27h', status: '未开始', color: 'ink-3' },
+  { num: '5', name: '自然语言处理', lessons: 29, hours: '~30h', status: '未开始', color: 'ink-3' },
+];
+---
+
+<BaseLayout title="AI 工程从零学起 — 交互式学习平台">
+  <Header title="AI 工程从零学起" activeNav="learn" />
+
+  <div class="pt-[52px] grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_280px] min-h-screen">
+    <Sidebar
+      currentPhase="第三阶段 · 深度学习核心"
+      lessons={lessons}
+      phases={phases}
+    />
+
+    <main class="px-6 lg:px-12 py-10 max-w-[780px]">
+      <!-- Hero -->
+      <div class="mb-10 animate-fade-up">
+        <h1 class="text-display text-ink mb-3">AI 工程从零学起</h1>
+        <p class="text-body text-ink-2 max-w-[560px]">
+          428 节课，20 个阶段，约 320 小时。从线性代数到自主 Agent Swarm，
+          每个算法都从原始数学开始构建。免费、开源、在你的笔记本上运行。
+        </p>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-12" style="animation: fadeUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) 0.08s forwards; opacity: 0;">
+        {stats.map(stat => (
+          <div class="card p-4 text-center">
+            <div class="text-2xl mb-1">{stat.icon}</div>
+            <div class="text-title text-ink">{stat.value}</div>
+            <div class="text-micro text-ink-3 mt-0.5">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Phase List -->
+      <div style="animation: fadeUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) 0.16s forwards; opacity: 0;">
+        <div class="section-label">课程阶段</div>
+        <div class="space-y-2">
+          {featuredPhases.map(phase => (
+            <a href="#" class="card flex items-center justify-between p-4 hover:shadow-md transition-shadow duration-200 group">
+              <div class="flex items-center gap-4">
+                <span class:list={[
+                  'text-micro font-semibold px-2.5 py-1 rounded-chip',
+                  phase.color === 'green' ? 'bg-green/10 text-green' : phase.color === 'blue' ? 'bg-blue/10 text-blue' : 'bg-black/[0.04] text-ink-3',
+                ]}>
+                  阶段 {phase.num}
+                </span>
+                <span class="text-[13px] font-medium text-ink">{phase.name}</span>
+              </div>
+              <div class="flex items-center gap-4 text-caption text-ink-2">
+                <span>{phase.lessons} 课时</span>
+                <span>{phase.hours}</span>
+                <span class:list={[
+                  'text-micro font-medium',
+                  phase.color === 'green' ? 'text-green' : phase.color === 'blue' ? 'text-blue' : 'text-ink-3',
+                ]}>
+                  {phase.status}
+                </span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="mt-12" style="animation: fadeUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) 0.24s forwards; opacity: 0;">
+        <div class="section-label">学习流程</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { step: '01', title: '阅读问题', desc: '理解为什么需要学这个', icon: '📖' },
+            { step: '02', title: '推导数学', desc: '从公式建立直觉', icon: '🧮' },
+            { step: '03', title: '编写代码', desc: '从零实现算法', icon: '💻' },
+            { step: '04', title: '运行测试', desc: '验证实现正确性', icon: '▶️' },
+            { step: '05', title: '对比框架', desc: '用 PyTorch 做同样的事', icon: '🔧' },
+            { step: '06', title: '产出工具', desc: 'Prompt / Skill / Agent', icon: '🚀' },
+          ].map(item => (
+            <div class="card p-4">
+              <div class="text-lg mb-2">{item.icon}</div>
+              <div class="text-micro text-ink-3 font-semibold mb-1">{item.step}</div>
+              <div class="text-[13px] font-medium text-ink mb-0.5">{item.title}</div>
+              <div class="text-caption text-ink-2">{item.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+
+    <RightPanel />
+  </div>
+</BaseLayout>
