@@ -39,9 +39,9 @@ describe('课程数据', () => {
   });
 
   it('getLesson 应该返回正确的课程', () => {
-    const lesson = getLesson('phase-3', '03-04');
-    expect(lesson).toBeDefined();
-    expect(lesson!.title).toContain('激活函数');
+    const result = getLesson('phase-3', '03-04');
+    expect(result).toBeDefined();
+    expect(result!.lesson.title).toContain('Activation Functions');
   });
 
   it('getTotalLessons 应该返回正确的总数', () => {
