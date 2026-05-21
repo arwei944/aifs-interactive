@@ -1,0 +1,104 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+
+const glossaryGroups = [
+  {
+    title: '神经网络基础',
+    terms: [
+      { name: '感知器 (Perceptron)', def: '最简单的神经网络单元，通过输入向量和权重的点积加上偏置，经过阶跃函数输出分类结果。' },
+      { name: '前向传播 (Forward Pass)', def: '将输入数据逐层通过网络的每一层——乘以权重、加上偏置、应用激活函数——最终产生输出。' },
+      { name: '反向传播 (Backpropagation)', def: '一种通过链式法则从输出层向输入层反向计算每个权重梯度（dL/dw）的算法。' },
+      { name: '激活函数 (Activation Function)', def: '应用于每个神经元输出的非线性函数，使网络能够学习非线性映射。常见类型：ReLU、Sigmoid、Tanh。' },
+      { name: '损失函数 (Loss Function)', def: '将模型预测值和目标值映射为一个标量的可微函数，优化器的目标是最小化它。' },
+      { name: '梯度消失 (Vanishing Gradient)', def: '梯度在反向传播中逐层衰减至接近 0，导致底层网络几乎不更新的现象。' },
+      { name: '梯度爆炸 (Exploding Gradient)', def: '梯度在反向传播中逐层指数级增长，导致训练不稳定甚至发散。' },
+    ]
+  },
+  {
+    title: '优化与训练',
+    terms: [
+      { name: '学习率 (Learning Rate)', def: '梯度更新时的标量乘数，是训练中最关键的超参数。太大导致发散，太小导致收敛极慢。' },
+      { name: 'SGD (随机梯度下降)', def: '使用小批量样本计算梯度并更新权重的优化算法：w = w - lr * gradient。' },
+      { name: '动量 (Momentum)', def: '对过去梯度的指数移动平均，抑制震荡并加速在一致方向上的收敛。' },
+      { name: '正则化 (Regularization)', def: '任何限制模型复杂度以提升泛化能力的技术：Dropout、权重衰减、归一化、数据增强等。' },
+      { name: 'Dropout', def: '训练时以概率 p 将随机神经元输出置零，迫使网络学习冗余表示，等效于训练集成模型。' },
+      { name: '批量归一化 (Batch Normalization)', def: '对每个小批量的 activations 进行标准化（减均值、除标准差），加速训练并稳定梯度。' },
+      { name: '学习率预热 (Warmup)', def: '在前 N 步将学习率从接近零线性增加到目标值，以稳定优化器的统计量。' },
+    ]
+  },
+  {
+    title: '卷积与视觉',
+    terms: [
+      { name: '卷积 (Convolution)', def: '一种在输入的每个空间位置应用的可学习点积运算，使用共享权重。数学上是互相关，但大家都叫卷积。' },
+      { name: '卷积核/滤波器 (Kernel/Filter)', def: '形状为 (C_in, K, K) 的小权重张量，与输入窗口的点积产生一个输出像素。' },
+      { name: '步幅 (Stride)', def: '连续卷积核放置之间的步长；步幅 2 会使每个空间维度减半。' },
+      { name: '残差连接 (Residual Connection)', def: 'y = F(x) + x；让优化器通过将 F 设为零来学习恒等映射，使任意深度可训练。' },
+      { name: '迁移学习 (Transfer Learning)', def: '利用在大数据集上预训练的模型权重，在目标任务上进行微调，大幅减少训练成本。' },
+    ]
+  },
+  {
+    title: 'Transformer 与注意力',
+    terms: [
+      { name: '自注意力 (Self-Attention)', def: '序列中每个位置通过 Query-Key 匹配对其他所有位置进行加权求和，捕获长距离依赖关系。' },
+      { name: 'Query (Q)', def: '输入的学习投影，表示该 token 正在寻找什么信息。' },
+      { name: 'Key (K)', def: '输入的学习投影，表示该 token 包含什么信息，用于与 Query 匹配。' },
+      { name: 'Value (V)', def: '输入的学习投影，携带根据注意力分数聚合的实际信息。' },
+      { name: '多头注意力 (Multi-Head Attention)', def: '将 Q/K/V 分成多个头并行计算注意力，然后拼接，使模型能同时关注不同子空间的信息。' },
+      { name: '位置编码 (Positional Encoding)', def: '为没有顺序概念的 Transformer 注入位置信息的方式，使模型能区分不同位置的 token。' },
+    ]
+  },
+  {
+    title: '大语言模型 (LLM)',
+    terms: [
+      { name: 'Tokenizer', def: '将文本转换为模型可消费的数字序列。常见方法：BPE、WordPiece、SentencePiece。' },
+      { name: 'BPE (Byte Pair Encoding)', def: '迭代合并最高频的相邻 token 对，直到达到目标词表大小。' },
+      { name: 'Temperature', def: '在 softmax 之前对 logit 分布的缩放因子。值越高分布越平坦（更随机），值越低越尖锐（更确定）。' },
+      { name: 'Top-p 采样', def: '将 token 采样限制在累积概率超过 p 的最小集合中，截断不太可能的长尾 token。' },
+      { name: '思维链 (Chain-of-Thought)', def: '引导模型在给出最终答案之前生成中间推理 token，延长模型的有效计算过程。' },
+      { name: 'RAG (检索增强生成)', def: '先从外部知识库检索相关文档，再将其作为上下文提供给 LLM 生成回答的技术。' },
+    ]
+  },
+  {
+    title: 'Agent 工程',
+    terms: [
+      { name: 'Agent', def: '一个循环：LLM 思考 → 选择工具 → 执行 → 结果反馈 → 重复直到停止。' },
+      { name: 'ReAct', def: 'Yao et al. 2022 提出的框架——在同一个流中交替产生 Thought、Action、Observation。' },
+      { name: '工具调用 (Tool Call)', def: '模型输出的结构化 JSON 载荷，包含 id、name、arguments，由运行时分发执行。' },
+      { name: '函数调用 (Function Calling)', def: '提供者级别的 API，支持模型发出结构化工具调用而非自然语言文本。' },
+      { name: 'ReWOO', def: '先规划，再并行获取证据，最后求解——规划提示中不包含中间观察结果。' },
+    ]
+  },
+];
+---
+
+<BaseLayout title="术语表 — AI 工程从零学起">
+  <Header title="术语表" activeNav="glossary" />
+
+  <div class="pt-[52px] px-6 lg:px-12 py-10 max-w-[780px] mx-auto">
+    <div class="mb-10">
+      <h1 class="text-[32px] font-bold text-ink leading-tight tracking-tight mb-3">术语表</h1>
+      <p class="text-[15px] text-ink-2 max-w-[560px]">
+        AI 工程核心术语速查。按主题分组，帮助你快速理解关键概念。
+      </p>
+    </div>
+
+    <div class="space-y-8">
+      {glossaryGroups.map(group => (
+        <div>
+          <h2 class="text-[18px] font-semibold text-ink mb-3 pb-2 border-b border-border">
+            {group.title}
+          </h2>
+          <div class="space-y-3">
+            {group.terms.map(term => (
+              <div class="card p-4">
+                <div class="text-[14px] font-semibold text-ink mb-1">{term.name}</div>
+                <div class="text-[13px] text-ink-2 leading-relaxed">{term.def}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

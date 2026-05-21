@@ -22,7 +22,7 @@ const totalLessons = getTotalLessons();
         <nav class="space-y-0.5">
           {phases.map(phase => (
             <a
-              href={`/${phase.id}/${phase.lessons[0]?.id || ''}`}
+              href={`/lesson/${phase.id}/${phase.lessons[0]?.id || ''}`}
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-ink-2 hover:bg-black/[0.04] hover:text-ink transition-all"
             >
               <span class="w-5 h-5 flex items-center justify-center rounded-full bg-blue/10 text-blue text-[10px] font-bold">

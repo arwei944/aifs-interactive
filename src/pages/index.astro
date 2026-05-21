@@ -3,29 +3,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Sidebar from '../components/Sidebar.astro';
 import RightPanel from '../components/RightPanel.astro';
+import { phases } from '../data/phases';
 
-const lessons = [
-  { num: '1', title: '感知机', status: 'done' as const },
-  { num: '2', title: '多层网络', status: 'done' as const },
-  { num: '3', title: '反向传播', status: 'done' as const },
-  { num: '4', title: '激活函数', status: 'active' as const },
-  { num: '5', title: '损失函数', status: 'pending' as const },
-  { num: '6', title: '优化器', status: 'pending' as const },
-  { num: '7', title: '正则化', status: 'pending' as const },
-  { num: '8', title: '批量归一化', status: 'pending' as const },
-];
+// 从真实数据中获取阶段3的课程列表
+const phase3 = phases.find(p => p.id === 'phase-3');
+const lessons = phase3 ? phase3.lessons.slice(0, 8).map((l, i) => ({
+  num: String(l.num),
+  title: l.title,
+  href: `/lesson/phase-3/${l.id}`,
+  status: i < 3 ? 'done' as const : i === 3 ? 'active' as const : 'pending' as const,
+})) : [];
 
-const phases = [
-  { id: '0', label: '阶段 0 · 环境搭建', status: 'done' as const },
-  { id: '1', label: '阶段 1 · 数学基础', status: 'done' as const },
-  { id: '2', label: '阶段 2 · 机器学习', status: 'done' as const },
-  { id: '3', label: '阶段 3 · 深度学习', status: 'current' as const },
-  { id: '4', label: '阶段 4 · 计算机视觉', status: 'pending' as const },
-  { id: '5', label: '阶段 5 · 自然语言处理', status: 'pending' as const },
-  { id: '7', label: '阶段 7 · Transformer', status: 'pending' as const },
-  { id: '10', label: '阶段 10 · 大语言模型', status: 'pending' as const },
-  { id: '14', label: '阶段 14 · 智能体工程', status: 'pending' as const },
-];
+const sidebarPhases = phases.map(p => ({
+  id: p.id,
+  label: `阶段 ${p.num} · ${p.shortTitle}`,
+  status: p.id === 'phase-3' ? 'current' as const : p.status === 'completed' ? 'done' as const : 'pending' as const,
+  href: `/lesson/${p.id}/${p.lessons[0]?.id || ''}`,
+}));
 
 const stats = [
   { label: '课时', value: '428', icon: '📚' },
@@ -34,14 +28,16 @@ const stats = [
   { label: '时长', value: '~320h', icon: '⏱' },
 ];
 
-const featuredPhases = [
-  { num: '0', name: '环境搭建', lessons: 12, hours: '~14h', status: '已完成', color: 'green' },
-  { num: '1', name: '数学基础', lessons: 22, hours: '~23h', status: '已完成', color: 'green' },
-  { num: '2', name: '机器学习', lessons: 18, hours: '~21h', status: '已完成', color: 'green' },
-  { num: '3', name: '深度学习核心', lessons: 13, hours: '~15h', status: '进行中', color: 'blue' },
-  { num: '4', name: '计算机视觉', lessons: 28, hours: '~27h', status: '未开始', color: 'ink-3' },
-  { num: '5', name: '自然语言处理', lessons: 29, hours: '~30h', status: '未开始', color: 'ink-3' },
-];
+// 从真实数据生成阶段卡片链接
+const featuredPhases = phases.slice(0, 6).map(p => ({
+  num: String(p.num),
+  name: p.shortTitle,
+  lessons: p.lessons.length,
+  hours: p.duration,
+  status: p.status === 'completed' ? '已完成' : p.id === 'phase-3' ? '进行中' : '未开始',
+  color: p.status === 'completed' ? 'green' : p.id === 'phase-3' ? 'blue' : 'ink-3',
+  href: `/lesson/${p.id}/${p.lessons[0]?.id || ''}`,
+}));
 ---
 
 <BaseLayout title="AI 工程从零学起 — 交互式学习平台">
@@ -51,7 +47,7 @@ const featuredPhases = [
     <Sidebar
       currentPhase="第三阶段 · 深度学习核心"
       lessons={lessons}
-      phases={phases}
+      phases={sidebarPhases}
     />
 
     <main class="px-6 lg:px-12 py-10 max-w-[780px]">
@@ -80,7 +76,7 @@ const featuredPhases = [
         <div class="section-label">课程阶段</div>
         <div class="space-y-2">
           {featuredPhases.map(phase => (
-            <a href="#" class="card flex items-center justify-between p-4 hover:shadow-md transition-shadow duration-200 group">
+            <a href={phase.href} class="card flex items-center justify-between p-4 hover:shadow-md transition-shadow duration-200 group">
               <div class="flex items-center gap-4">
                 <span class:list={[
                   'text-micro font-semibold px-2.5 py-1 rounded-chip',

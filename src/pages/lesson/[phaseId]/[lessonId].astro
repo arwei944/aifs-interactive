@@ -20,11 +20,13 @@ export function getStaticPaths() {
 
 const { phaseId, lessonId } = Astro.params;
 const phase = getPhase(phaseId);
-const lesson = getLesson(phaseId, lessonId);
+const lessonResult = getLesson(phaseId, lessonId);
 
-if (!phase || !lesson) {
+if (!phase || !lessonResult?.lesson) {
   return Astro.redirect('/');
 }
+
+const lesson = lessonResult.lesson;
 
 // 找到当前课在列表中的索引
 const currentIndex = phase.lessons.findIndex(l => l.id === lessonId);
@@ -51,6 +53,7 @@ const sidebarPhases = phases.map(p => ({
   id: p.id,
   label: `阶段 ${p.num} · ${p.shortTitle}`,
   status: p.id === phaseId ? 'current' as const : p.status === 'completed' ? 'done' as const : 'pending' as const,
+  href: `/lesson/${p.id}/${p.lessons[0]?.id || ''}`,
 }));
 
 // 术语数据
@@ -67,7 +70,7 @@ const glossaryTerms = [
   <div class="pt-[52px] grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_280px] min-h-screen">
     <Sidebar
       currentPhase={`第 ${toChineseNum(phase.num)} 阶段 · ${phase.shortTitle}`}
-      lessons={sidebarLessons.map(l => ({...l, href: `/${phaseId}/${l.id || ''}`}))}
+      lessons={sidebarLessons.map(l => ({...l, href: `/lesson/${phaseId}/${l.id || ''}`}))}
       phases={sidebarPhases}
     />
 
@@ -103,13 +106,13 @@ const glossaryTerms = [
       <!-- 上一课 / 下一课 -->
       <div class="flex justify-between mt-12 pt-8 border-t border-border">
         {prevLesson ? (
-          <a href={`/${phaseId}/${prevLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
+          <a href={`/lesson/${phaseId}/${prevLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
             <span class="text-ink-3 group-hover:text-blue transition-colors">←</span>
             <span>{prevLesson.title}</span>
           </a>
         ) : <div />}
         {nextLesson ? (
-          <a href={`/${phaseId}/${nextLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
+          <a href={`/lesson/${phaseId}/${nextLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
             <span>{nextLesson.title}</span>
             <span class="text-ink-3 group-hover:text-blue transition-colors">→</span>
           </a>
