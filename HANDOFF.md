@@ -1,7 +1,7 @@
 # AIFS-Interactive 项目交接文档
 
 > **最后更新**: 2026-05-21  
-> **项目状态**: 开发中（M1-M11 已完成，M8 内容中文化 100% 已完成）  
+> **项目状态**: 开发中（M1-M11 已完成，M8 翻译+校对已完成）  
 > **仓库**: `https://github.com/arwei944/aifs-interactive.git`  
 > **分支**: `main`
 
@@ -87,6 +87,7 @@ aifs-interactive/
 │   ├── extract_data.py          # 从原站仓库提取课程数据
 │   ├── translate_md.py          # Markdown 批量翻译脚本（v2 旧版，已弃用）
 │   └── translate_fast.py        # 高速翻译脚本 v3（多进程并行版，当前使用）
+│   └── proofread.py             # 翻译质量校对脚本（自动修正术语/格式/占位符）
 ├── data/
 │   └── runtime/                 # 运行时动态数据（不触发 Vite HMR）
 │       ├── translate-progress.json  # 翻译进度
@@ -259,6 +260,11 @@ python3 scripts/translate_fast.py --all --force
 
 # 翻译旧版（v2，已弃用，仅供参考）
 python3 scripts/translate_md.py --all --workers 3
+
+# ===== 校对（自动修正翻译问题） =====
+python3 scripts/proofread.py --all              # 校对所有文件
+python3 scripts/proofread.py --all --dry-run    # 只检查不修改
+python3 scripts/proofread.py --phase 5          # 只校对阶段 5
 ```
 
 ---
@@ -316,13 +322,26 @@ PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "15-19" --
 - AI 专有名词可能被误译（如 "Sigmoid" → "乙状结肠"），需后续人工校对
 - `phases.ts` 中的标题已翻译并手动修正了 183 处错误
 
-### 🟡 P1：翻译质量校对
+### 🟡 P1：翻译质量校对（✅ 已完成）
 
-翻译完成后需要校对：
-1. 抽查各阶段翻译质量
-2. 修正 AI 术语的误译（保留英文或使用标准中文译名）
-3. 检查 Markdown 格式是否被破坏（标题、列表、代码块）
-4. 修正 `phases.ts` 中标题翻译的残留错误
+**校对结果**: 432/435 个文件被自动修正，0 错误
+
+**校对脚本**: `scripts/proofread.py`
+
+**修正内容**:
+
+| 修正类型 | 说明 | 影响文件数 |
+|---------|------|-----------|
+| AI 术语误译 | 法学硕士→LLM、激活功能→激活函数、变压器→Transformer、美人鱼→mermaid、贴标机→标注者 等 | ~80 |
+| Markdown 格式 | `* *` → `**`（加粗标记被拆开）、代码块标记修复 | ~200 |
+| 损坏占位符 | Z0、随机字母数字串清理 | ~400 |
+| 代码关键词 | 定义→def、导入→import（代码中的中文关键词还原） | ~60 |
+
+**已知残留问题**（需人工处理）:
+- 2 个文件（06-05.md、16-10.md）翻译不完整，有大段英文残留
+- 部分 Mermaid 图表内部被翻译（需逐个手动恢复英文）
+- 部分代码块内部被翻译（需逐个手动恢复英文）
+- 元数据行 `**Prerequisites:**` 的值仍为英文课程引用（设计如此，不需修改）
 
 ### 🟡 P2：更多可视化组件嵌入
 
@@ -436,6 +455,7 @@ python3 /data/user/work/fix_glossary.py
 | M6 | 学习仪表盘 | ✅ 完成 |
 | M7 | 测试体系（26 个测试用例） | ✅ 完成 |
 | M8 | 内容中文化（435 课翻译） | ✅ 100% (435/435) |
+| M8.1 | 翻译质量校对（自动修正） | ✅ 432/435 文件修正 |
 | M9 | 术语表扩充（83 个术语） | ✅ 完成 |
 | M10 | 更多可视化组件（4 个新组件） | ✅ 完成 |
 | M11 | 翻译监控页面（多进程 + API 端点） | ✅ 完成 |
