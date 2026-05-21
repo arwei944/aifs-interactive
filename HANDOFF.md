@@ -1,7 +1,7 @@
 # AIFS-Interactive 项目交接文档
 
 > **最后更新**: 2026-05-21  
-> **项目状态**: 开发中（M1-M7 已完成，内容中文化进行中）  
+> **项目状态**: 开发中（M1-M11 已完成，M8 内容中文化 35.6% 进行中）  
 > **仓库**: `https://github.com/arwei944/aifs-interactive.git`  
 > **分支**: `main`
 
@@ -19,7 +19,7 @@
 - **6 种交互式可视化组件**（激活函数、梯度下降、注意力、卷积、扩散、聚类）
 - **代码沙箱**（Pyodide + CodeMirror 6，浏览器内运行 Python）
 - **学习进度追踪**（localStorage 持久化 + 连续学习热力图）
-- **实时翻译监控页面**（`/translate`，5 秒自动刷新）
+- **实时翻译监控页面**（`/translate`，纯动态 DOM 更新，无页面刷新）
 
 ### 技术栈
 
@@ -68,7 +68,11 @@ aifs-interactive/
 │   ├── pages/
 │   │   ├── index.astro          # 首页
 │   │   ├── dashboard.astro      # 学习仪表盘
-│   │   ├── translate.astro      # 翻译进度监控
+│   │   ├── translate.astro      # 翻译进度监控（纯动态更新）
+│   │   ├── api/                 # API 端点（运行时数据）
+│   │   │   ├── translate-progress.json.ts  # 翻译进度 API
+│   │   │   ├── translate-log.json.ts       # 翻译日志 API
+│   │   │   └── workers.json.ts             # Worker 进程状态 API
 │   │   └── lesson/
 │   │       └── [phaseId]/
 │   │           └── [lessonId].astro  # 动态课程页
@@ -81,17 +85,23 @@ aifs-interactive/
 │       └── useProgress.test.ts  # 进度 Hook 测试（8 个）
 ├── scripts/
 │   ├── extract_data.py          # 从原站仓库提取课程数据
-│   └── translate_md.py          # Markdown 批量翻译脚本（v2 并发版）
+│   ├── translate_md.py          # Markdown 批量翻译脚本（v2 旧版，已弃用）
+│   └── translate_fast.py        # 高速翻译脚本 v3（多进程并行版，当前使用）
+├── data/
+│   └── runtime/                 # 运行时动态数据（不触发 Vite HMR）
+│       ├── translate-progress.json  # 翻译进度
+│       ├── translate-log.json       # 翻译日志
+│       └── workers/                 # 各 Worker 进程状态
+│           ├── worker-A.json
+│           ├── worker-B.json
+│           └── worker-C.json
 ├── public/
-│   ├── content/
-│   │   └── lessons/             # 435 个 .md 课程文件
-│   ├── translate-progress.json  # 翻译进度（前端可读）
-│   └── translate-log.json       # 翻译日志（前端可读）
-├── astro.config.mjs             # Astro 配置
+│   └── content/
+│       └── lessons/             # 435 个 .md 课程文件
+├── astro.config.mjs             # Astro 配置（含 Vite watch 忽略规则）
 ├── vitest.config.mjs            # Vitest 配置
 ├── tsconfig.json                # TypeScript 配置
-├── package.json                 # 依赖和脚本
-└── .translate_progress.json     # 翻译进度（内部用）
+└── package.json                 # 依赖和脚本
 ```
 
 ---
@@ -229,13 +239,26 @@ npm run test:watch       # 监听模式
 # 数据提取（从原站仓库）
 python3 scripts/extract_data.py
 
-# 翻译
-python3 scripts/translate_md.py --all              # 翻译全部（3 并发）
-python3 scripts/translate_md.py --phase 3          # 只翻译阶段 3
-python3 scripts/translate_md.py --lesson 03-04     # 只翻译指定课程
-python3 scripts/translate_md.py --titles-only      # 只翻译 phases.ts 标题
-python3 scripts/translate_md.py --force            # 强制重新翻译
-python3 scripts/translate_md.py --workers 5        # 自定义并发数
+# ===== 翻译（v3 高速版，推荐） =====
+# 多进程并行翻译（3 个进程，各负责不同阶段）
+python3 scripts/translate_fast.py --phase-range "5-9" --worker-id "worker-A" --workers 5 --no-sync
+python3 scripts/translate_fast.py --phase-range "10-14" --worker-id "worker-B" --workers 5 --no-sync
+python3 scripts/translate_fast.py --phase-range "15-19" --worker-id "worker-C" --workers 5 --sync-interval 600
+
+# 单进程翻译（简单场景）
+python3 scripts/translate_fast.py --all --workers 10 --sync-interval 600
+
+# 只翻译指定阶段
+python3 scripts/translate_fast.py --phase-range "5-9" --workers 5
+
+# 只翻译指定课程
+python3 scripts/translate_fast.py --lesson 03-04
+
+# 强制重新翻译
+python3 scripts/translate_fast.py --all --force
+
+# 翻译旧版（v2，已弃用，仅供参考）
+python3 scripts/translate_md.py --all --workers 3
 ```
 
 ---
@@ -244,32 +267,54 @@ python3 scripts/translate_md.py --workers 5        # 自定义并发数
 
 ### 🔴 P0：内容中文化翻译（进行中）
 
-**当前状态**: 54/435 文件已翻译（12.4%），0 失败
+**当前状态**: 155/435 文件已翻译（35.6%），0 失败
 
-**问题**: 旧版翻译脚本太慢（每文件 ~50 秒），已重写为 v2 并发版但尚未启动。
+**翻译架构**（v3 高速版）:
+- **多进程并行**: 3 个独立 Python 进程，各负责不同阶段范围
+  - Worker A: Phase 5-9（61 文件）
+  - Worker B: Phase 10-14（131 文件）
+  - Worker C: Phase 15-19（122 文件，负责 Git 同步）
+- **翻译引擎**: youdao（`translators` 库，免费无需 API Key）
+- **并发**: 每进程 5 线程，总计 15 线程
+- **批量策略**: 整文件合并翻译，每文件仅 1-3 次 API 调用
+- **断点续传**: 已翻译文件自动跳过
+- **Git 自动同步**: Worker C 每 10 分钟 `git push` 到 GitHub
+- **速度**: ~0.1 文件/s（~10s/文件），预计总耗时 ~40 分钟
 
-**如何继续**:
-```bash
-# 直接启动翻译（支持断点续传，会跳过已翻译的 54 个文件）
-cd /workspace/aifs-interactive
-python3 scripts/translate_md.py --all --workers 3
+**运行时数据流**:
+```
+翻译脚本 → data/runtime/translate-progress.json
+         → data/runtime/translate-log.json
+         → data/runtime/workers/{worker-id}.json
+                    ↓
+前端 API 端点 → /api/translate-progress.json
+             → /api/translate-log.json
+             → /api/workers.json
+                    ↓
+前端 JS → fetch API → DOM 动态更新（无页面刷新）
 ```
 
-**翻译脚本 v2 优化点**:
-- 批量合并文本行，减少 API 调用次数
-- 3 线程并发翻译
-- 详细日志（记录每个文件的标题、字符数、状态）
-- 进度实时同步到 `public/translate-progress.json`
+**翻译监控页面** (`/translate`):
+- 每 3 秒通过 API 端点获取数据
+- 纯 DOM 动态更新，**不触发页面刷新**
+- 显示：总进度条、统计卡片、各 Worker 进程独立进度、各阶段进度、翻译日志
+- 新增日志条目蓝色闪烁动画
+
+**如何继续翻译**:
+```bash
+cd /workspace/aifs-interactive
+# 启动 3 个并行 worker（后台运行）
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "5-9" --worker-id "worker-A" --workers 5 --no-sync &
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "10-14" --worker-id "worker-B" --workers 5 --no-sync &
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "15-19" --worker-id "worker-C" --workers 5 --sync-interval 600 &
+# 监控: 浏览器访问 http://localhost:4321/translate
+```
 
 **翻译质量注意事项**:
 - 翻译使用有道免费 API（`translators` 库的 `youdao` 引擎）
 - 代码块、表格、元数据行（`**Type:** Build`）不翻译
 - AI 专有名词可能被误译（如 "Sigmoid" → "乙状结肠"），需后续人工校对
 - `phases.ts` 中的标题已翻译并手动修正了 183 处错误
-
-**监控翻译进度**:
-- 启动开发服务器后访问 `/translate` 页面
-- 页面每 5 秒自动刷新，显示进度条、统计卡片、各阶段进度、详细日志
 
 ### 🟡 P1：翻译质量校对
 
@@ -298,7 +343,7 @@ python3 scripts/translate_md.py --all --workers 3
 用户选择暂不部署。推荐方案：
 - **Vercel**（免费额度大，Astro 官方支持好）
 - 需要配置：`astro.config.mjs` 中的 `output: 'static'`（当前默认）
-- 注意：翻译监控页面依赖动态 JSON 文件，静态部署后无法实时更新
+- 注意：翻译监控页面依赖 API 端点（SSR），静态部署时需改为预渲染或使用 Edge Functions
 
 ### 🟢 P4：其他改进
 
@@ -353,12 +398,20 @@ python3 /data/user/work/fix_glossary.py
 ### 构建相关
 - `phases.ts` 是自动生成的，**不要手动编辑**（用 `extract_data.py` 重新生成）
 - 翻译后的标题中可能有未转义的单引号（如 `Anthropic's`），构建时会报 esbuild 错误，需手动转义为 `\'`
-- `public/translate-progress.json` 和 `public/translate-log.json` 是运行时生成的，不应提交到 git（但当前已提交）
 
 ### 翻译相关
 - 有道翻译 API 可能在高并发时被限流，脚本有 3 次重试机制
-- 翻译脚本 v2 使用线程池并发，但 `translators` 库不是线程安全的，可能出现竞争条件（建议 `--workers 3` 不要太高）
-- 已翻译的文件记录在 `.translate_progress.json` 的 `translated` 数组中，重新运行会自动跳过
+- `translators` 库不是线程安全的，多进程并行时各进程独立运行，无竞争条件
+- 已翻译的文件记录在 `data/runtime/translate-progress.json` 的 `translated` 数组中，重新运行会自动跳过
+- 运行时数据存储在 `data/runtime/` 而非 `public/`，避免触发 Vite HMR 页面刷新
+
+### Vite HMR 相关
+- `astro.config.mjs` 中配置了 `server.watch.ignored`，忽略以下目录的文件变化：
+  - `**/data/runtime/**`（翻译进度、日志、Worker 状态）
+  - `**/public/content/lessons/**`（翻译输出的 .md 文件）
+  - `**/.translate_progress.json`（旧版进度文件）
+- 翻译监控页面通过 API 端点（`/api/*.json`）获取数据，不读取 public 下的静态文件
+- **不要**把动态 JSON 文件放回 `public/` 目录，否则会重新触发页面刷新
 
 ### 组件相关
 - `LessonContent.tsx` 中的 `client:load` 指令必须直接放在 React 组件标签上，不能包裹在 div 中
@@ -382,10 +435,10 @@ python3 /data/user/work/fix_glossary.py
 | M5 | 增强测验系统 + 进度追踪 | ✅ 完成 |
 | M6 | 学习仪表盘 | ✅ 完成 |
 | M7 | 测试体系（26 个测试用例） | ✅ 完成 |
-| M8 | 内容中文化（435 课翻译） | 🔄 12.4% |
+| M8 | 内容中文化（435 课翻译） | 🔄 35.6% (155/435) |
 | M9 | 术语表扩充（83 个术语） | ✅ 完成 |
 | M10 | 更多可视化组件（4 个新组件） | ✅ 完成 |
-| M11 | 翻译监控页面 | ✅ 完成 |
+| M11 | 翻译监控页面（多进程 + API 端点） | ✅ 完成 |
 | M12 | 部署 | ⏳ 待定 |
 
 ---
@@ -398,6 +451,7 @@ cd /workspace/aifs-interactive
 
 # 2. 安装依赖（如果需要）
 npm install
+pip install translators --break-system-packages
 
 # 3. 验证构建
 npm run build        # 应输出 438 页面，0 错误
@@ -409,9 +463,15 @@ npm test             # 应输出 26 passed
 npm run dev          # 访问 http://localhost:4321
 
 # 6. 继续翻译（最重要！）
-python3 scripts/translate_md.py --all --workers 3
+# 多进程并行（推荐）
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "5-9" --worker-id "worker-A" --workers 5 --no-sync &
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "10-14" --worker-id "worker-B" --workers 5 --no-sync &
+PYTHONUNBUFFERED=1 python3 -u scripts/translate_fast.py --phase-range "15-19" --worker-id "worker-C" --workers 5 --sync-interval 600 &
 
-# 7. 监控翻译进度
+# 或单进程
+python3 scripts/translate_fast.py --all --workers 10 --sync-interval 600
+
+# 7. 监控翻译进度（纯动态更新，无页面刷新）
 # 浏览器访问 http://localhost:4321/translate
 ```
 
