@@ -1,0 +1,102 @@
+---
+title: 激活函数：ReLU、Sigmoid、GELU 及其原理
+phaseId: phase-3
+lessonId: 03-04
+type: build
+lang: Python
+duration: 45min
+---
+
+## 问题引入
+
+没有激活函数的神经网络，无论堆叠多少层，本质上只是一个线性回归模型。激活函数赋予了网络**学习非线性决策边界**的能力。
+
+但选哪个呢？ReLU 会"杀死"负值区域。Sigmoid 容易饱和。Tanh 把所有值压缩到 [-1, 1]。GELU 虽然平滑但计算更昂贵。理解每种激活函数**为什么存在**（以及何时会失效），是让模型成功训练还是停滞不前的关键。
+
+## 核心概念
+
+激活函数是神经网络中引入非线性的关键组件。没有它们，无论网络多深，最终都等价于一个线性变换：
+
+$$y = W_n \cdot \sigma(W_{n-1} \cdot \sigma(\cdots \sigma(W_1 \cdot x + b_1) \cdots) + b_n)$$
+
+其中 $\sigma$ 就是激活函数。
+
+## 从零实现
+
+### ReLU — 深度学习的基石
+
+ReLU（Rectified Linear Unit）是最简单的激活函数：$\text{ReLU}(x) = \max(0, x)$
+
+```python
+import numpy as np
+
+def relu(x):
+    """ReLU: max(0, x)"""
+    return np.maximum(0, x)
+
+# 特点：计算极快，但在 x < 0 时梯度为 0
+x = np.array([-2, -1, 0, 1, 2])
+print(f"ReLU({x}) = {relu(x)}")
+# 输出: ReLU([-2 -1  0  1  2]) = [0 0 0 1 2]
+```
+
+### Sigmoid — 概率输出
+
+Sigmoid 将任意值压缩到 (0, 1)：$\sigma(x) = \frac{1}{1 + e^{-x}}$
+
+```python
+def sigmoid(x):
+    """Sigmoid: 压缩到 (0, 1)"""
+    return 1 / (1 + np.exp(-x))
+
+print(f"Sigmoid({x}) = {sigmoid(x)}")
+# 输出: Sigmoid([-2 -1  0  1  2]) = [0.119 0.269 0.5 0.731 0.881]
+```
+
+### GELU — Transformer 的选择
+
+GELU（Gaussian Error Linear Unit）是平滑且处处可微的：
+
+```python
+def gelu(x):
+    """GELU: 高斯误差线性单元"""
+    return 0.5 * x * (1 + np.tanh(
+        np.sqrt(2 / np.pi) * (x + 0.044715 * x**3)
+    ))
+
+print(f"GELU({x}) = {gelu(x)}")
+# 输出: GELU([-2 -1  0  1  2]) = [-0.045 -0.159 0.0 0.841 1.994]
+```
+
+## 对比总结
+
+| 激活函数 | 范围 | 优点 | 缺点 | 使用场景 |
+|---------|------|------|------|---------|
+| ReLU | [0, +∞) | 计算快、缓解梯度消失 | 负区域死亡 | 隐藏层默认选择 |
+| Sigmoid | (0, 1) | 输出可解释为概率 | 饱和、梯度消失 | 二分类输出层 |
+| Tanh | (-1, 1) | 零中心化 | 仍然饱和 | LSTM 门控 |
+| GELU | (-∞, +∞) | 平滑、非零梯度 | 计算较慢 | Transformer |
+| Swish | (-∞, +∞) | 自门控、平滑 | 需要调参 β | 现代深度网络 |
+
+## 检验理解
+
+**Q1.** ReLU 在 x < 0 时的梯度是什么？这会导致什么问题？
+
+- A) 梯度为 0，导致「神经元死亡」问题 ✅
+- B) 梯度为 1，导致梯度爆炸
+- C) 梯度为 -1，导致权重振荡
+- D) 梯度为 x，导致数值不稳定
+
+**Q2.** 为什么 Transformer 模型使用 GELU 而不是 ReLU？
+
+- A) GELU 计算更快
+- B) GELU 是平滑的、非零的，梯度流动更好 ✅
+- C) GELU 输出范围是 (0, 1)
+- D) ReLU 在注意力机制中无法使用
+
+**Q3.** Sigmoid 函数在什么情况下会出现梯度消失？
+
+- A) 当 x 接近 0 时
+- B) 当 |x| 很大时（输入饱和区域）✅
+- C) 当 x 为负数时
+- D) 只在多层网络中才会

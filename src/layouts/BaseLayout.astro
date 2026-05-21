@@ -1,4 +1,6 @@
 ---
+import SearchModal from '../components/SearchModal';
+
 interface Props {
   title: string;
 }
@@ -17,6 +19,7 @@ const { title } = Astro.props;
   </head>
   <body>
     <slot />
+    <SearchModal client:load />
   </body>
 </html>
 

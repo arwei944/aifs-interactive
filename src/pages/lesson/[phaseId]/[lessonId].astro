@@ -1,0 +1,122 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Sidebar from '../../../components/Sidebar.astro';
+import RightPanel from '../../../components/RightPanel.astro';
+import LessonContent from '../../../components/LessonContent';
+import { phases, getPhase, getLesson } from '../../../data/phases';
+
+export function getStaticPaths() {
+  const paths = [];
+  for (const phase of phases) {
+    for (const lesson of phase.lessons) {
+      paths.push({
+        params: { phaseId: phase.id, lessonId: lesson.id },
+      });
+    }
+  }
+  return paths;
+}
+
+const { phaseId, lessonId } = Astro.params;
+const phase = getPhase(phaseId);
+const lesson = getLesson(phaseId, lessonId);
+
+if (!phase || !lesson) {
+  return Astro.redirect('/');
+}
+
+// 找到当前课在列表中的索引
+const currentIndex = phase.lessons.findIndex(l => l.id === lessonId);
+const prevLesson = currentIndex > 0 ? phase.lessons[currentIndex - 1] : null;
+const nextLesson = currentIndex < phase.lessons.length - 1 ? phase.lessons[currentIndex + 1] : null;
+
+// 中文数字转换
+function toChineseNum(n: number): string {
+  const chars = ['零','一','二','三','四','五','六','七','八','九','十',
+    '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+  return n < chars.length ? chars[n] : String(n);
+}
+
+// 侧边栏课时列表数据
+const sidebarLessons = phase.lessons.map(l => ({
+  num: String(l.num),
+  id: l.id,
+  title: l.title,
+  status: l.id === lessonId ? 'active' as const : currentIndex > phase.lessons.findIndex(x => x.id === l.id) ? 'done' as const : 'pending' as const,
+}));
+
+// 侧边栏阶段列表数据
+const sidebarPhases = phases.map(p => ({
+  id: p.id,
+  label: `阶段 ${p.num} · ${p.shortTitle}`,
+  status: p.id === phaseId ? 'current' as const : p.status === 'completed' ? 'done' as const : 'pending' as const,
+}));
+
+// 术语数据
+const glossaryTerms = [
+  { name: '神经元死亡', def: '当神经元输出恒为 0，梯度永远为 0，该神经元不再学习' },
+  { name: '梯度消失', def: '梯度在反向传播中逐层衰减至接近 0，底层网络几乎不更新' },
+  { name: '饱和', def: '激活函数在输入极端值时输出趋于常数，梯度接近 0' },
+];
+---
+
+<BaseLayout title={`${lesson.title} — AI 工程从零学起`}>
+  <Header title={`${lesson.title} — AI 工程从零学起`} activeNav="learn" />
+
+  <div class="pt-[52px] grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_280px] min-h-screen">
+    <Sidebar
+      currentPhase={`第 ${toChineseNum(phase.num)} 阶段 · ${phase.shortTitle}`}
+      lessons={sidebarLessons.map(l => ({...l, href: `/${phaseId}/${l.id || ''}`}))}
+      phases={sidebarPhases}
+    />
+
+    <main class="px-6 lg:px-12 py-10 max-w-[780px]">
+      <!-- 面包屑 -->
+      <nav class="text-[12px] text-ink-3 mb-5 flex items-center gap-1.5">
+        <a href="/" class="text-ink-2 hover:text-blue transition-colors">首页</a>
+        <span class="opacity-50 text-[10px]">›</span>
+        <a href="/" class="text-ink-2 hover:text-blue transition-colors">{phase.shortTitle}</a>
+        <span class="opacity-50 text-[10px]">›</span>
+        <span class="text-ink">{lesson.title}</span>
+      </nav>
+
+      <!-- 标题 -->
+      <h1 class="text-[32px] font-bold text-ink leading-tight tracking-tight mb-2" style="animation: fadeUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) forwards; opacity:0;">
+        {lesson.title}
+      </h1>
+
+      <div class="flex items-center gap-2.5 text-[13px] text-ink-2 mb-8" style="animation: fadeUp 0.5s cubic-bezier(0.25,0.46,0.45,0.94) 0.06s forwards; opacity:0;">
+        <span class="px-2.5 py-0.5 rounded-chip text-[12px] font-medium bg-green/10 text-green">
+          {lesson.type === 'build' ? '🛠 动手实现' : '📖 理论学习'}
+        </span>
+        <span class="px-2.5 py-0.5 rounded-chip text-[12px] font-medium bg-blue/10 text-blue">
+          {lesson.lang}
+        </span>
+        <span class="text-ink-3">·</span>
+        <span>约 {lesson.duration}</span>
+      </div>
+
+      <!-- 课程内容 -->
+      <LessonContent client:load phaseId={phaseId} lessonId={lessonId} />
+
+      <!-- 上一课 / 下一课 -->
+      <div class="flex justify-between mt-12 pt-8 border-t border-border">
+        {prevLesson ? (
+          <a href={`/${phaseId}/${prevLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
+            <span class="text-ink-3 group-hover:text-blue transition-colors">←</span>
+            <span>{prevLesson.title}</span>
+          </a>
+        ) : <div />}
+        {nextLesson ? (
+          <a href={`/${phaseId}/${nextLesson.id}`} class="group flex items-center gap-2 text-[13px] text-ink-2 hover:text-blue transition-colors">
+            <span>{nextLesson.title}</span>
+            <span class="text-ink-3 group-hover:text-blue transition-colors">→</span>
+          </a>
+        ) : <div />}
+      </div>
+    </main>
+
+    <RightPanel />
+  </div>
+</BaseLayout>
