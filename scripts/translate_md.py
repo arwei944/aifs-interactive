@@ -18,6 +18,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 LESSONS_DIR = PROJECT_DIR / "public" / "content" / "lessons"
 PROGRESS_FILE = PROJECT_DIR / ".translate_progress.json"
+PUBLIC_PROGRESS_FILE = PROJECT_DIR / "public" / "translate-progress.json"
+PUBLIC_LOG_FILE = PROJECT_DIR / "public" / "translate-log.json"
 MAX_SEGMENT = 4000
 
 # 正则
@@ -46,12 +48,23 @@ def load_progress():
     if PROGRESS_FILE.exists():
         with open(PROGRESS_FILE) as f:
             return json.load(f)
-    return {"translated": [], "failed": [], "last_file": None}
+    return {"translated": [], "failed": [], "last_file": None, "log": [], "start_time": None}
 
 
 def save_progress(progress):
     with open(PROGRESS_FILE, "w") as f:
         json.dump(progress, f, indent=2, ensure_ascii=False)
+    # 同步到 public 目录供前端页面读取
+    try:
+        with open(PUBLIC_PROGRESS_FILE, "w") as f:
+            json.dump(progress, f, indent=2, ensure_ascii=False)
+        # 只保留最近 200 条日志
+        if progress.get("log"):
+            progress["log"] = progress["log"][-200:]
+        with open(PUBLIC_LOG_FILE, "w") as f:
+            json.dump({"log": progress.get("log", [])}, f, indent=2, ensure_ascii=False)
+    except:
+        pass
 
 
 def is_code_block_line(line):
@@ -287,12 +300,18 @@ def translate_file(filepath, progress, force=False):
         progress["last_file"] = fname
         if fname in progress["failed"]:
             progress["failed"].remove(fname)
+        if "log" not in progress:
+            progress["log"] = []
+        progress["log"].append({"file": fname, "status": "ok", "time": time.time()})
         save_progress(progress)
         return "ok"
 
     except Exception as e:
         print(f"\n  ❌ 文件错误 {fname}: {e}")
         progress["failed"].append(fname)
+        if "log" not in progress:
+            progress["log"] = []
+        progress["log"].append({"file": fname, "status": "error", "msg": str(e), "time": time.time()})
         save_progress(progress)
         return "error"
 
@@ -320,6 +339,9 @@ def main():
         return 1
 
     progress = load_progress()
+    if not progress.get("start_time"):
+        progress["start_time"] = time.time()
+        save_progress(progress)
 
     if args.titles_only:
         print("\n📝 翻译 phases.ts 中的标题...")
