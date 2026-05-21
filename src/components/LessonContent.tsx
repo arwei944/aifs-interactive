@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import CodeSandbox from './CodeSandbox';
+import ActivationViz from './ActivationViz';
+import GradientDescentViz from './GradientDescentViz';
 
 interface Props {
   phaseId: string;
@@ -7,9 +9,10 @@ interface Props {
 }
 
 interface ContentBlock {
-  type: 'html' | 'code';
+  type: 'html' | 'code' | 'viz';
   content: string;
   language?: string;
+  vizType?: string;
 }
 
 export default function LessonContent({ phaseId, lessonId }: Props) {
@@ -63,25 +66,58 @@ export default function LessonContent({ phaseId, lessonId }: Props) {
             </div>
           );
         }
+        if (block.type === 'viz') {
+          return (
+            <div key={i} className="my-4">
+              {block.vizType === 'gradient-descent' ? <GradientDescentViz /> : <ActivationViz />}
+            </div>
+          );
+        }
         return <div key={i} dangerouslySetInnerHTML={{ __html: block.content }} />;
       })}
     </div>
   );
 }
 
-/** 将 Markdown 拆分为 HTML 块和代码块 */
+/** 将 Markdown 拆分为 HTML 块、代码块和可视化块 */
 function parseMarkdown(md: string): ContentBlock[] {
   // 移除 YAML frontmatter
   md = md.replace(/^---[\s\S]*?---\n/, '');
 
   const blocks: ContentBlock[] = [];
+
+  // 匹配 :::viz type="xxx" ... ::: 块
+  const vizBlockRegex = /:::viz\s+type="([^"]+)"\s*\n([\s\S]*?):::/g;
   // 匹配代码块 ```lang\ncode```
   const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = codeBlockRegex.exec(md)) !== null) {
-    // 代码块之前的文本作为 HTML 块
+  // 合并所有块的起始位置
+  type BlockMatch = { index: number; length: number; type: 'viz' | 'code'; block: ContentBlock };
+  const allMatches: BlockMatch[] = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = vizBlockRegex.exec(md)) !== null) {
+    allMatches.push({
+      index: m.index,
+      length: m[0].length,
+      type: 'viz',
+      block: { type: 'viz', content: m[2].trim(), vizType: m[1] },
+    });
+  }
+  while ((m = codeBlockRegex.exec(md)) !== null) {
+    allMatches.push({
+      index: m.index,
+      length: m[0].length,
+      type: 'code',
+      block: { type: 'code', content: m[2].trimEnd(), language: m[1] || 'code' },
+    });
+  }
+
+  // 按位置排序
+  allMatches.sort((a, b) => a.index - b.index);
+
+  let lastIndex = 0;
+  for (const match of allMatches) {
     if (match.index > lastIndex) {
       const textBefore = md.slice(lastIndex, match.index);
       const html = renderMarkdownToHtml(textBefore);
@@ -89,15 +125,8 @@ function parseMarkdown(md: string): ContentBlock[] {
         blocks.push({ type: 'html', content: html });
       }
     }
-
-    // 代码块
-    blocks.push({
-      type: 'code',
-      content: match[2].trimEnd(),
-      language: match[1] || 'code',
-    });
-
-    lastIndex = match.index + match[0].length;
+    blocks.push(match.block);
+    lastIndex = match.index + match.length;
   }
 
   // 剩余文本
