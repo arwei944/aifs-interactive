@@ -1,0 +1,76 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import RightPanel from '../components/RightPanel.astro';
+import Header from '../components/Header.astro';
+import { phases, getTotalLessons } from '../data/phases';
+import DashboardStats from '../components/DashboardStats';
+import PhaseProgress from '../components/PhaseProgress';
+import StreakHeatmap from '../components/StreakHeatmap';
+
+const totalLessons = getTotalLessons();
+---
+
+<BaseLayout title="学习仪表盘 — AI 工程从零学起">
+  <Header title="学习仪表盘" activeNav="dashboard" />
+
+  <div class="pt-[52px] flex min-h-screen">
+    <!-- 左侧边栏 -->
+    <aside class="hidden lg:block w-[240px] flex-shrink-0 border-r border-border bg-surface/50">
+      <div class="sticky top-[52px] h-[calc(100vh-52px)] overflow-y-auto p-4">
+        <div class="section-label mb-3">快速导航</div>
+        <nav class="space-y-0.5">
+          {phases.map(phase => (
+            <a
+              href={`/${phase.id}/${phase.lessons[0]?.id || ''}`}
+              class="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-ink-2 hover:bg-black/[0.04] hover:text-ink transition-all"
+            >
+              <span class="w-5 h-5 flex items-center justify-center rounded-full bg-blue/10 text-blue text-[10px] font-bold">
+                {phase.num}
+              </span>
+              <span>{phase.shortTitle}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 min-w-0 px-6 lg:px-10 py-8 max-w-[960px]">
+      <!-- 页面标题 -->
+      <div class="mb-8">
+        <h1 class="text-[28px] font-bold text-ink tracking-tight">学习仪表盘</h1>
+        <p class="text-[15px] text-ink-2 mt-1.5">追踪你的 AI 工程学习进度</p>
+      </div>
+
+      <!-- 统计卡片 -->
+      <DashboardStats client:load
+        totalLessons={totalLessons}
+        completedLessons={0}
+        streak={0}
+        quizAccuracy={0}
+      />
+
+      <!-- 两列布局 -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+        <!-- 阶段进度 -->
+        <div>
+          <PhaseProgress client:load phases={phases} progress={{}} />
+        </div>
+
+        <!-- 学习热力图 -->
+        <div>
+          <StreakHeatmap client:load progress={{}} />
+        </div>
+      </div>
+
+      <!-- 最近学习 -->
+      <div class="mt-6 bg-surface border border-border rounded-[12px] p-5 shadow-sm">
+        <div class="section-label mb-4">最近学习</div>
+        <div id="recent-lessons" class="space-y-2">
+          <p class="text-[14px] text-ink-3 py-4 text-center">开始学习后，这里会显示你的学习记录</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</BaseLayout>

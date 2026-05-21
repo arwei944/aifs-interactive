@@ -7,10 +7,10 @@ interface Props {
 const { title = 'AI 工程从零学起', activeNav = 'learn' } = Astro.props;
 
 const navItems = [
-  { id: 'learn', label: '学习' },
-  { id: 'path', label: '路径' },
-  { id: 'glossary', label: '术语表' },
-  { id: 'dashboard', label: '仪表盘' },
+  { id: 'learn', label: '学习', href: '/' },
+  { id: 'path', label: '路径', href: '/path' },
+  { id: 'glossary', label: '术语表', href: '/glossary' },
+  { id: 'dashboard', label: '仪表盘', href: '/dashboard' },
 ];
 ---
 
@@ -28,7 +28,7 @@ const navItems = [
   <nav class="ml-auto flex gap-1">
     {navItems.map(item => (
       <a
-        href={`/${item.id}`}
+        href={item.href}
         class:list={[
           'text-[13px] font-normal px-3 py-1.5 rounded-md transition-all duration-200',
           item.id === activeNav
